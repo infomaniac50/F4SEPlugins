@@ -372,6 +372,12 @@ DWORD CharGenInterface::LoadPreset(const std::string & filePath)
 		if(npc->morphSetValue) {
 			npc->morphSetValue->Clear();
 			npc->morphSetValue->Allocate(5);
+
+			for (size_t i = 0; i < 5; i++)
+			{
+				(*npc->morphSetValue)[i] = 0.0f;
+			}
+
 			size_t elements = (std::min<size_t>)(5, fValues.size());
 			for(size_t i = 0; i < elements; i++)
 			{
