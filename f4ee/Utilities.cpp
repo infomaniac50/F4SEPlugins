@@ -103,49 +103,52 @@ bool VisitObjects(NiAVObject * parent, std::function<bool(NiAVObject*)> functor)
 }
 
 
-std::string GetFormIdentifier(TESForm * form)
+std::string GetFormIdentifier(TESForm* form)
 {
-	char formName[MAX_PATH];
+	char formName[MAX_PATH] = { 0 };
 	UInt8 modIndex = form->formID >> 24;
 	UInt32 modForm = form->formID & 0xFFFFFF;
 
 	ModInfo* modInfo = nullptr;
-	if(modIndex == 0xFE)
+	if (modIndex == 0xFE)
 	{
 		UInt16 lightIndex = (form->formID >> 12) & 0xFFF;
-		if(lightIndex < (*g_dataHandler)->modList.lightMods.count)
+		if (lightIndex < (*g_dataHandler)->modList.lightMods.count)
 			modInfo = (*g_dataHandler)->modList.lightMods[lightIndex];
 	}
 	else
 	{
 		modInfo = (*g_dataHandler)->modList.loadedMods[modIndex];
 	}
-	
+
 	if (modInfo) {
-		sprintf_s(formName, "%s|%06X", modInfo->name, modForm);
+		if (modIndex == 0xFE)
+			sprintf_s(formName, "%s|%03X", modInfo->name, modForm & 0xFFF);
+		else
+			sprintf_s(formName, "%s|%06X", modInfo->name, modForm);
 	}
 
 	return formName;
 }
 
-TESForm * GetFormFromIdentifier(const std::string & formIdentifier)
+TESForm* GetFormFromIdentifier(const std::string& formIdentifier)
 {
 	std::size_t pos = formIdentifier.find_first_of('|');
 	std::string modName = formIdentifier.substr(0, pos);
-	std::string modForm = formIdentifier.substr(pos+1);
+	std::string modForm = formIdentifier.substr(pos + 1);
 
 	UInt32 formId = 0;
 	sscanf_s(modForm.c_str(), "%X", &formId);
 
 	UInt8 modIndex = (*g_dataHandler)->GetLoadedModIndex(modName.c_str());
-	if(modIndex != 0xFF) {
-		formId |= ((UInt32)modIndex) << 24;
+	if (modIndex != 0xFF) {
+		formId |= static_cast<UInt32>(modIndex) << 24;
 	}
 	else
 	{
 		UInt16 lightModIndex = (*g_dataHandler)->GetLoadedLightModIndex(modName.c_str());
-		if(lightModIndex != 0xFFFF) {
-			formId |= 0xFE000000 | (UInt32(lightModIndex) << 12);
+		if (lightModIndex != 0xFFFF) {
+			formId = 0xFE000000 | (static_cast<UInt32>(lightModIndex) << 12) | (formId & 0xFFF);
 		}
 	}
 

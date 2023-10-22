@@ -520,7 +520,7 @@ DWORD CharGenInterface::LoadPreset(const std::string & filePath)
 						if(newEntry->GetType() == BGSCharacterTint::Entry::kTypePalette) {
 							BGSCharacterTint::PaletteEntry * palette = static_cast<BGSCharacterTint::PaletteEntry*>(newEntry);
 							BGSCharacterTint::Template::Palette * paletteTemplate = static_cast<BGSCharacterTint::Template::Palette*>(templateEntry);
-							palette->color.bgra = tints[key]["Color"].asUInt();
+							palette->color.bgra = static_cast<UInt32>(tints[key]["Color"].asInt());
 							SInt16 colorID = tints[key]["ColorID"].asInt();
 							auto colorData = paletteTemplate->GetColorDataByID(colorID); // Validate the color index
 							if(colorData)
