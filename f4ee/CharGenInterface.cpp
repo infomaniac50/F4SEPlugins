@@ -362,24 +362,28 @@ DWORD CharGenInterface::LoadPreset(const std::string & filePath)
 	{
 		Json::Value values = root["Morphs"]["Values"];
 		std::vector<float> fValues;
-		for(auto & value : values)
+		for (auto& value : values)
 		{
 			fValues.push_back(value.asFloat());
 		}
 
-		if(!npc->morphSetValue && fValues.size() > 0)
+		if (!npc->morphSetValue && fValues.size() > 0)
 			npc->morphSetValue = new tArray<float>();
-		if(npc->morphSetValue) {
+
+		if (npc->morphSetValue) {
 			npc->morphSetValue->Clear();
 			npc->morphSetValue->Allocate(5);
+			for (size_t i = 0; i < npc->morphSetValue->count; i++)
+				npc->morphSetValue->entries[i] = 0.0f;
+
 			size_t elements = (std::min<size_t>)(5, fValues.size());
-			for(size_t i = 0; i < elements; i++)
+			for (size_t i = 0; i < elements; i++)
 			{
 				(*npc->morphSetValue)[i] = fValues.at(i);
 			}
 		}
 	}
-	catch(const std::exception& e)
+	catch (const std::exception& e)
 	{
 		_ERROR(e.what());
 	}
