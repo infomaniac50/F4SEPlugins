@@ -539,100 +539,98 @@ void F4EEBodyGenUpdate::Run()
 #include "f4se/BSGraphics.h"
 #include "Morpher.h"
 
-bool BodyMorphInterface::ApplyMorphsToShape(Actor * actor, const MorphableShapePtr & morphableShape)
-{
+bool BodyMorphInterface::ApplyMorphsToShape(Actor* actor, const MorphableShapePtr& morphableShape) {
 	// Don't allow dynamic shapes
-	BSDynamicTriShape * dynamicShape = morphableShape->object->GetAsBSDynamicTriShape();
-	if(dynamicShape) {
+	BSDynamicTriShape* dynamicShape = morphableShape->object->GetAsBSDynamicTriShape();
+	if (dynamicShape) {
 		_WARNING("%s - Shape: %s is dynamic and could not be morphed\t[%s]", __FUNCTION__, morphableShape->shapeName.c_str(), morphableShape->morphPath.c_str());
 		return false;
 	}
 
-	BSTriShape * geometry = morphableShape->object->GetAsBSTriShape();
-	if(geometry) {
+	BSTriShape* geometry = morphableShape->object->GetAsBSTriShape();
+	if (!geometry)
+		return false;
 
-		// Lookup the TRI file from the parsed path
-		auto triMap = GetTrishapeMap(morphableShape->morphPath);
-		if(!triMap) {
-			return false;
-		}
+	// Lookup the TRI file from the parsed path
+	auto triMap = GetTrishapeMap(morphableShape->morphPath);
+	if (!triMap)
+		return false;
 
-		ShrinkMorphCache();
+	ShrinkMorphCache();
 
-		// Lookup the particular morph set for this shape
-		auto morphMap = triMap->GetMorphData(morphableShape->shapeName);
-		if(!morphMap) {
-			return false;
-		}
+	// Lookup the particular morph set for this shape
+	auto morphMap = triMap->GetMorphData(morphableShape->shapeName);
+	if (!morphMap)
+		return false;
 
-		bool isFemale = false;
-		TESNPC * npc = DYNAMIC_CAST(actor->baseForm, TESForm, TESNPC);
-		if(npc)
-			isFemale = CALL_MEMBER_FN(npc, GetSex)() == 1 ? true : false;
+	bool isFemale = false;
+	TESNPC* npc = DYNAMIC_CAST(actor->baseForm, TESForm, TESNPC);
+	if (npc)
+		isFemale = CALL_MEMBER_FN(npc, GetSex)() == 1 ? true : false;
 
-		auto actorMorphs = GetMorphMap(actor, isFemale); // Get the actor's list of morphs
-		if(!actorMorphs) // There's nothing to morph, lets just use the base mesh
-			return false;
+	// Wait for setting morphMap
+	std::this_thread::sleep_for(std::chrono::microseconds(1));
 
-		UInt64 vertexDesc = geometry->vertexDesc;
-		UInt32 vertexSize = geometry->GetVertexSize();
-		UInt32 blockSize = geometry->numVertices * vertexSize;
+	auto actorMorphs = GetMorphMap(actor, isFemale); // Get the actor's list of morphs
+	if (!actorMorphs) // There's nothing to morph, lets just use the base mesh
+		return false;
 
-		BSGeometryData * baseData = geometry->geometryData;
-		BSGeometryData * geomData = nullptr;
-		if(!baseData)
-			return false;
+	UInt64 vertexDesc = geometry->vertexDesc;
+	UInt32 vertexSize = geometry->GetVertexSize();
+	UInt32 blockSize = geometry->numVertices * vertexSize;
 
-		auto vertexData = baseData->vertexData;
-		if(!vertexData)
-			return false;
+	BSGeometryData* baseData = geometry->geometryData;
+	BSGeometryData* geomData = nullptr;
+	if (!baseData)
+		return false;
 
-		if(!(vertexDesc & BSGeometry::kFlag_Vertex)) // What kind of dumbass mesh doesn't have verts
-			return false;
+	auto vertexData = baseData->vertexData;
+	if (!vertexData)
+		return false;
+
+	if (!(vertexDesc & BSGeometry::kFlag_Vertex)) // What kind of dumbass mesh doesn't have verts
+		return false;
 
 #ifdef _DEBUG_MOPRHING
-		_DMESSAGE("%s - Morphing %s (%08X) (%s -> %s) through hook", __FUNCTION__, CALL_MEMBER_FN(actor, GetReferenceName)(), actor->formID, morphableShape->shapeName.c_str(), geometry->m_name.c_str());
+	_DMESSAGE("%s - Morphing %s (%08X) (%s -> %s) through hook", __FUNCTION__, CALL_MEMBER_FN(actor, GetReferenceName)(), actor->formID, morphableShape->shapeName.c_str(), geometry->m_name.c_str());
 #endif
 
-		UInt8 * newBlock = nullptr;
+	UInt8* newBlock = nullptr;
 
-		// Create the cloned copy
-		geomData = CALL_MEMBER_FN(g_renderManager, CreateBSGeometryData)(&blockSize, vertexData->vertexBlock, geometry->vertexDesc, baseData->triangleData);
-		if(!geomData)
-			return false;
+	// Create the cloned copy
+	geomData = CALL_MEMBER_FN(g_renderManager, CreateBSGeometryData)(&blockSize, vertexData->vertexBlock, geometry->vertexDesc, baseData->triangleData);
+	if (!geomData)
+		return false;
 
-		newBlock = geomData->vertexData->vertexBlock;
+	newBlock = geomData->vertexData->vertexBlock;
 
-		MorphApplicator morpher(geometry, newBlock, newBlock, [&](std::vector<Morpher::Vector3> & verts)
-		{
-			SimpleLocker locker(&m_morphLock);
+	MorphApplicator morpher(geometry, newBlock, newBlock, [&](std::vector<Morpher::Vector3>& verts) {
+		SimpleLocker locker(&m_morphLock);
 
-			actorMorphs->Lock();
-			for(auto & actorMorph : *actorMorphs)
-			{
-				float effectiveValue = actorMorph.second->GetEffectiveValue();
-				if(effectiveValue == 0.0f)
-					continue;
+		actorMorphs->Lock();
+		for (auto& actorMorph : *actorMorphs) {
+			float effectiveValue = actorMorph.second->GetEffectiveValue();
+			if (effectiveValue == 0.0f)
+				continue;
 
-				auto morph = morphMap->GetVertexData(*actorMorph.first);
-				if(!morph)
-					continue;
+			auto morph = morphMap->GetVertexData(*actorMorph.first);
+			if (!morph)
+				continue;
 
-				bool outOfBounds = morph->ApplyMorph(geometry->numVertices, (NiPoint3*)&verts.at(0), effectiveValue);
-				if(outOfBounds) {
-					_WARNING("%s - Shape: %s Morph: %s contained out of bounds vertices\t[%s]", __FUNCTION__, morphableShape->shapeName.c_str(), actorMorph.first->c_str(), morphableShape->morphPath.c_str());
-				}
+			bool outOfBounds = morph->ApplyMorph(geometry->numVertices, (NiPoint3*)&verts.at(0), effectiveValue);
+			if (outOfBounds) {
+				_WARNING("%s - Shape: %s Morph: %s contained out of bounds vertices\t[%s]", __FUNCTION__, morphableShape->shapeName.c_str(), actorMorph.first->c_str(), morphableShape->morphPath.c_str());
 			}
-			actorMorphs->Unlock();
-		});
-
-		if(geomData) {
-			geometry->geometryData = geomData;
-
-			// We don't want to delete the original copy, but we'll release because we are forking (Don't know what the other ref is for?)
-			if(baseData->refCount > 2)
-				InterlockedDecrement(&baseData->refCount);
 		}
+		actorMorphs->Unlock();
+	});
+
+	if (geomData) {
+		geometry->geometryData = geomData;
+
+		// We don't want to delete the original copy, but we'll release because we are forking (Don't know what the other ref is for?)
+		if (baseData->refCount > 2)
+			InterlockedDecrement(&baseData->refCount);
 	}
 
 	return false;
