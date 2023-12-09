@@ -335,8 +335,7 @@ void SkinInterface::Save(const F4SESerializationInterface * intfc, UInt32 kVersi
 		Serialization::WriteData<UInt32>(intfc, &ovr.first);
 
 		// Value
-		UInt32 stringId = g_stringTable.GetStringID(ovr.second);
-		Serialization::WriteData<UInt32>(intfc, &stringId);
+		Serialization::WriteData<const char>(intfc, ovr.second->c_str());
 	}
 
 	m_skinOverride.Release();
@@ -362,18 +361,34 @@ bool SkinInterface::Load(const F4SESerializationInterface * intfc, UInt32 kVersi
 			return false;
 		}
 
-		UInt32 stringId;
-		if (!Serialization::ReadData<UInt32>(intfc, &stringId))
-		{
-			_ERROR("%s - Error loading skin override string id", __FUNCTION__);
-			return false;
-		}
+		F4EEFixedString id;
 
-		auto it = stringTable.find(stringId);
-		if(it == stringTable.end())
-		{
-			_ERROR("%s - Error loading skin override string from table", __FUNCTION__);
-			continue;
+		if (kVersion == kVersion1) {
+			UInt32 stringId;
+			if (!Serialization::ReadData<UInt32>(intfc, &stringId))
+			{
+				_ERROR("%s - Error loading skin override string id", __FUNCTION__);
+				return false;
+			}
+
+			auto it = stringTable.find(stringId);
+			if (it == stringTable.end())
+			{
+				_ERROR("%s - Error loading skin override string from table", __FUNCTION__);
+				continue;
+			}
+
+			id = *it->second;
+		}
+		else if (kVersion == kVersion2) {
+			std::string id_str;
+			if (!Serialization::ReadData<std::string>(intfc, &id_str))
+			{
+				_ERROR("%s - Error loading skin override string id", __FUNCTION__);
+				return false;
+			}
+
+			id = *g_stringTable.GetString(id_str);
 		}
 
 		if(!intfc->ResolveFormId(formId, &newFormId))
@@ -390,7 +405,7 @@ bool SkinInterface::Load(const F4SESerializationInterface * intfc, UInt32 kVersi
 		UInt64 gender = CALL_MEMBER_FN(npc, GetSex)();
 		bool isFemale = gender == 1 ? true : false;
 
-		g_skinInterface.AddSkinOverride(actor, *it->second, isFemale);
+		g_skinInterface.AddSkinOverride(actor, id, isFemale);
 		g_actorUpdateManager.PushUpdate(actor);
 	}
 

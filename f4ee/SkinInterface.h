@@ -62,7 +62,8 @@ public:
 	enum
 	{
 		kVersion1 = 1,
-		kSerializationVersion = kVersion1,
+		kVersion2 = 2,
+		kSerializationVersion = kVersion2,
 	};
 
 	virtual void Save(const F4SESerializationInterface * intfc, UInt32 kVersion);
