@@ -1258,7 +1258,7 @@ bool CharGenInterface::LoadHairColorData(const std::string & filePath, const Mod
 					UInt32 formId = 0;
 					sscanf_s(value.asCString(), "%X", &formId);
 
-					formId |= modInfo->GetPartialIndex() << (modInfo->IsLight() ? 16 : 24);
+					formId |= modInfo->GetPartialIndex() << (modInfo->IsLight() ? 12 : 24);
 
 					TESForm * form = LookupFormByID(formId);
 					if(!form) {
