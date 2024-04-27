@@ -316,9 +316,10 @@ bool OverlayInterface::RemoveOverlay(Actor * actor, bool isFemale, UniqueID uid)
 		OverlayDataPtr overlayPtr = it->second;
 		if(!overlayPtr)
 			continue;
-		
+
 		if(overlayPtr->uid == uid) {
 			m_dataMap.erase(overlayPtr->uid);
+			m_freeIndices.push_back(overlayPtr->uid);
 			priorityMap->erase(it);
 			return true;
 		}
@@ -467,13 +468,10 @@ void OverlayInterface::OverlayData::Save(const F4SESerializationInterface * intf
 
 	if((flags & kHasTintColor) == kHasTintColor)
 	{
-		UInt32 a = max(0, min(tintColor.a * 255, 255));
-		UInt32 r = max(0, min(tintColor.r * 255, 255));
-		UInt32 g = max(0, min(tintColor.g * 255, 255));
-		UInt32 b = max(0, min(tintColor.b * 255, 255));
-
-		UInt32 tintARGB = (a << 24) | (r << 16) | (g << 8) | b;
-		Serialization::WriteData<UInt32>(intfc, &tintARGB);
+		Serialization::WriteData<float>(intfc, &tintColor.a);
+		Serialization::WriteData<float>(intfc, &tintColor.r);
+		Serialization::WriteData<float>(intfc, &tintColor.g);
+		Serialization::WriteData<float>(intfc, &tintColor.b);
 	}
 	if((flags & kHasOffsetUV) == kHasOffsetUV)
 	{
@@ -523,22 +521,51 @@ bool OverlayInterface::OverlayData::Load(const F4SESerializationInterface * intf
 
 	if((flags & kHasTintColor) == kHasTintColor)
 	{
-		UInt32 tintARGB;
-		if (!Serialization::ReadData<UInt32>(intfc, &tintARGB))
+		if (kVersion >= kVersion3)
 		{
-			_ERROR("%s - Error loading overlay tint color", __FUNCTION__);
-			return false;
+			if (!Serialization::ReadData<float>(intfc, &tintColor.a))
+			{
+				_ERROR("%s - Error loading overlay tint color alpha", __FUNCTION__);
+				return false;
+			}
+
+			if (!Serialization::ReadData<float>(intfc, &tintColor.r))
+			{
+				_ERROR("%s - Error loading overlay tint color red", __FUNCTION__);
+				return false;
+			}
+
+			if (!Serialization::ReadData<float>(intfc, &tintColor.g))
+			{
+				_ERROR("%s - Error loading overlay tint color green", __FUNCTION__);
+				return false;
+			}
+
+			if (!Serialization::ReadData<float>(intfc, &tintColor.b))
+			{
+				_ERROR("%s - Error loading overlay tint color blue", __FUNCTION__);
+				return false;
+			}
 		}
+		else if (kVersion >= kVersion1)
+		{
+			UInt32 tintARGB;
+			if (!Serialization::ReadData<UInt32>(intfc, &tintARGB))
+			{
+				_ERROR("%s - Error loading overlay tint color", __FUNCTION__);
+				return false;
+			}
 
-		float a = (tintARGB >> 24) & 0xFF;
-		float r = (tintARGB >> 16) & 0xFF;
-		float g = (tintARGB >> 8) & 0xFF;
-		float b = tintARGB & 0xFF;
+			float a = (tintARGB >> 24) & 0xFF;
+			float r = (tintARGB >> 16) & 0xFF;
+			float g = (tintARGB >> 8) & 0xFF;
+			float b = tintARGB & 0xFF;
 
-		tintColor.a = max(0, min(a / 255.0f, 1.0f));
-		tintColor.r = max(0, min(r / 255.0f, 1.0f));
-		tintColor.g = max(0, min(g / 255.0f, 1.0f));
-		tintColor.b = max(0, min(b / 255.0f, 1.0f));
+			tintColor.a = max(0, min(a / 255.0f, 1.0f));
+			tintColor.r = max(0, min(r / 255.0f, 1.0f));
+			tintColor.g = max(0, min(g / 255.0f, 1.0f));
+			tintColor.b = max(0, min(b / 255.0f, 1.0f));
+		}
 	}
 
 	if((flags & kHasOffsetUV) == kHasOffsetUV)
@@ -798,7 +825,7 @@ bool OverlayInterface::Load(const F4SESerializationInterface * intfc, UInt32 kVe
 			m_freeIndices.push_back(uid);
 		}
 	}
-	
+
 	return true;
 }
 
